@@ -13,23 +13,35 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Find and extract tar.gz file
+      - name: List all files in repo (debug)
         run: |
-          TARFILE=$(find . -maxdepth 2 -name "*.tar.gz" | head -1)
+          echo "=== All files in repo ==="
+          find . -not -path './.git/*' | sort
+
+      - name: Find archive file (tar.gz or tar)
+        run: |
+          echo "=== Searching for archive ==="
+          TARFILE=$(find . -not -path './.git/*' \( -name "*.tar.gz" -o -name "*.tar" \) | head -1)
           if [ -z "$TARFILE" ]; then
-            echo "ERROR: No .tar.gz file found!"
+            echo "ERROR: No archive file found in repo!"
+            echo "Upload the WClient tar.gz file to the root of the repo."
             exit 1
           fi
-          echo "Found archive: $TARFILE"
+          echo "Found: $TARFILE"
+          echo "TARFILE=$TARFILE" >> $GITHUB_ENV
+
+      - name: Extract archive
+        run: |
           mkdir -p extracted
-          tar -xzf "$TARFILE" -C extracted
+          tar -xf "$TARFILE" -C extracted
+          echo "=== Extracted contents ==="
           ls extracted/
 
-      - name: Find project root
+      - name: Find project root (with gradlew)
         run: |
           PROJECT_DIR=$(find extracted -name "gradlew" -type f | head -1 | xargs dirname)
           if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: gradlew not found!"
+            echo "ERROR: gradlew not found inside archive!"
             exit 1
           fi
           echo "Project root: $PROJECT_DIR"
