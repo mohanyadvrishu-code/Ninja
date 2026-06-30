@@ -1,0 +1,64 @@
+name: Build APK from uploaded archive
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Find and extract tar.gz file
+        run: |
+          TARFILE=$(find . -maxdepth 2 -name "*.tar.gz" | head -1)
+          if [ -z "$TARFILE" ]; then
+            echo "ERROR: No .tar.gz file found!"
+            exit 1
+          fi
+          echo "Found archive: $TARFILE"
+          mkdir -p extracted
+          tar -xzf "$TARFILE" -C extracted
+          ls extracted/
+
+      - name: Find project root
+        run: |
+          PROJECT_DIR=$(find extracted -name "gradlew" -type f | head -1 | xargs dirname)
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "ERROR: gradlew not found!"
+            exit 1
+          fi
+          echo "Project root: $PROJECT_DIR"
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: wrapper
+
+      - name: Make gradlew executable
+        run: chmod +x "$PROJECT_DIR/gradlew"
+
+      - name: Build Release APK
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: WClient-Release-APK
+          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 30
