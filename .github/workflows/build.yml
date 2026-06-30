@@ -30,13 +30,18 @@ jobs:
           echo "Project root: $PROJECT_DIR"
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
 
-      - name: Patch settings.gradle.kts with missing repos
+      - name: Patch settings.gradle.kts - add missing repos
         run: |
           SETTINGS="$PROJECT_DIR/settings.gradle.kts"
-          echo "Patching: $SETTINGS"
           sed -i 's|maven("https://repo.opencollab.dev/maven-releases")|maven("https://repo.opencollab.dev/maven-releases")\n        maven("https://maven.lenni0451.net/releases")\n        maven("https://maven.lenni0451.net/snapshots")\n        maven("https://jitpack.io")|' "$SETTINGS"
-          echo "=== settings.gradle.kts after patch ==="
-          cat "$SETTINGS"
+          echo "Settings patched"
+
+      - name: Patch libs.versions.toml - fix MinecraftAuth version
+        run: |
+          VERSIONS="$PROJECT_DIR/gradle/libs.versions.toml"
+          sed -i 's/minecraft-auth = "4.3.0"/minecraft-auth = "5.0.1"/' "$VERSIONS"
+          echo "Version patched:"
+          grep "minecraft-auth" "$VERSIONS"
 
       - name: Fix proguard - remove unsupported keepmessages
         run: |
