@@ -13,39 +13,36 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: List all files in repo (debug)
+      - name: Find and extract archive
         run: |
-          echo "=== All files in repo ==="
-          find . -not -path './.git/*' | sort
-
-      - name: Find archive file (tar.gz or tar)
-        run: |
-          echo "=== Searching for archive ==="
           TARFILE=$(find . -not -path './.git/*' \( -name "*.tar.gz" -o -name "*.tar" \) | head -1)
           if [ -z "$TARFILE" ]; then
-            echo "ERROR: No archive file found in repo!"
-            echo "Upload the WClient tar.gz file to the root of the repo."
+            echo "ERROR: No archive file found!"
             exit 1
           fi
           echo "Found: $TARFILE"
-          echo "TARFILE=$TARFILE" >> $GITHUB_ENV
-
-      - name: Extract archive
-        run: |
           mkdir -p extracted
           tar -xf "$TARFILE" -C extracted
-          echo "=== Extracted contents ==="
-          ls extracted/
 
-      - name: Find project root (with gradlew)
+      - name: Find project root
         run: |
           PROJECT_DIR=$(find extracted -name "gradlew" -type f | head -1 | xargs dirname)
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "ERROR: gradlew not found inside archive!"
-            exit 1
-          fi
           echo "Project root: $PROJECT_DIR"
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+
+      - name: Patch settings.gradle.kts with missing repos
+        run: |
+          SETTINGS="$PROJECT_DIR/settings.gradle.kts"
+          echo "Patching: $SETTINGS"
+          sed -i 's|maven("https://repo.opencollab.dev/maven-releases")|maven("https://repo.opencollab.dev/maven-releases")\n        maven("https://maven.lenni0451.net/releases")\n        maven("https://maven.lenni0451.net/snapshots")\n        maven("https://jitpack.io")|' "$SETTINGS"
+          echo "=== settings.gradle.kts after patch ==="
+          cat "$SETTINGS"
+
+      - name: Fix proguard - remove unsupported keepmessages
+        run: |
+          PROGUARD="$PROJECT_DIR/app/proguard-rules.pro"
+          sed -i '/-keepmessages/d' "$PROGUARD"
+          echo "Proguard fixed"
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
