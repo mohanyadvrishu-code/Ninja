@@ -34,20 +34,35 @@ jobs:
         run: |
           SETTINGS="$PROJECT_DIR/settings.gradle.kts"
           sed -i 's|maven("https://repo.opencollab.dev/maven-releases")|maven("https://repo.opencollab.dev/maven-releases")\n        maven("https://maven.lenni0451.net/releases")\n        maven("https://maven.lenni0451.net/snapshots")\n        maven("https://jitpack.io")|' "$SETTINGS"
-          echo "Settings patched"
 
-      - name: Patch libs.versions.toml - fix MinecraftAuth version
+      - name: Patch libs.versions.toml - fix versions
         run: |
           VERSIONS="$PROJECT_DIR/gradle/libs.versions.toml"
           sed -i 's/minecraft-auth = "4.3.0"/minecraft-auth = "5.0.1"/' "$VERSIONS"
-          echo "Version patched:"
           grep "minecraft-auth" "$VERSIONS"
 
-      - name: Fix proguard - remove unsupported keepmessages
+      - name: Patch build.gradle.kts - fix compileSdk 36 to 35
         run: |
-          PROGUARD="$PROJECT_DIR/app/proguard-rules.pro"
-          sed -i '/-keepmessages/d' "$PROGUARD"
-          echo "Proguard fixed"
+          BUILD="$PROJECT_DIR/app/build.gradle.kts"
+          sed -i 's/compileSdk = 36/compileSdk = 35/' "$BUILD"
+          sed -i 's/targetSdk = 36/targetSdk = 35/' "$BUILD"
+          echo "SDK patched"
+
+      - name: Fix proguard
+        run: |
+          sed -i '/-keepmessages/d' "$PROJECT_DIR/app/proguard-rules.pro"
+
+      - name: Patch gradle.properties - fix memory and workers
+        run: |
+          PROPS="$PROJECT_DIR/gradle.properties"
+          echo "" >> "$PROPS"
+          echo "org.gradle.jvmargs=-Xmx5120m -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError" >> "$PROPS"
+          echo "org.gradle.parallel=false" >> "$PROPS"
+          echo "org.gradle.workers.max=2" >> "$PROPS"
+          echo "kotlin.daemon.jvmargs=-Xmx3000m" >> "$PROPS"
+          echo "org.gradle.configuration-cache=false" >> "$PROPS"
+          echo "Properties patched"
+          cat "$PROPS"
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -65,9 +80,14 @@ jobs:
 
       - name: Build Release APK
         working-directory: ${{ env.PROJECT_DIR }}
-        run: ./gradlew :app:assembleRelease --no-daemon --no-configuration-cache --stacktrace
+        run: |
+          ./gradlew :app:assembleRelease \
+            --no-daemon \
+            --no-parallel \
+            --no-configuration-cache \
+            --stacktrace
         env:
-          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4096m -Dorg.gradle.daemon=false -Dorg.gradle.configuration-cache=false"
+          GRADLE_OPTS: "-Xmx2048m"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
