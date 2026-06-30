@@ -1,4 +1,4 @@
-name: Build APK from uploaded archive
+name: Build APK
 
 on:
   push:
@@ -16,53 +16,11 @@ jobs:
       - name: Find and extract archive
         run: |
           TARFILE=$(find . -not -path './.git/*' \( -name "*.tar.gz" -o -name "*.tar" \) | head -1)
-          if [ -z "$TARFILE" ]; then
-            echo "ERROR: No archive file found!"
-            exit 1
-          fi
           echo "Found: $TARFILE"
           mkdir -p extracted
           tar -xf "$TARFILE" -C extracted
-
-      - name: Find project root
-        run: |
           PROJECT_DIR=$(find extracted -name "gradlew" -type f | head -1 | xargs dirname)
-          echo "Project root: $PROJECT_DIR"
           echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
-
-      - name: Patch settings.gradle.kts - add missing repos
-        run: |
-          SETTINGS="$PROJECT_DIR/settings.gradle.kts"
-          sed -i 's|maven("https://repo.opencollab.dev/maven-releases")|maven("https://repo.opencollab.dev/maven-releases")\n        maven("https://maven.lenni0451.net/releases")\n        maven("https://maven.lenni0451.net/snapshots")\n        maven("https://jitpack.io")|' "$SETTINGS"
-
-      - name: Patch libs.versions.toml - fix versions
-        run: |
-          VERSIONS="$PROJECT_DIR/gradle/libs.versions.toml"
-          sed -i 's/minecraft-auth = "4.3.0"/minecraft-auth = "5.0.1"/' "$VERSIONS"
-          grep "minecraft-auth" "$VERSIONS"
-
-      - name: Patch build.gradle.kts - fix compileSdk 36 to 35
-        run: |
-          BUILD="$PROJECT_DIR/app/build.gradle.kts"
-          sed -i 's/compileSdk = 36/compileSdk = 35/' "$BUILD"
-          sed -i 's/targetSdk = 36/targetSdk = 35/' "$BUILD"
-          echo "SDK patched"
-
-      - name: Fix proguard
-        run: |
-          sed -i '/-keepmessages/d' "$PROJECT_DIR/app/proguard-rules.pro"
-
-      - name: Patch gradle.properties - fix memory and workers
-        run: |
-          PROPS="$PROJECT_DIR/gradle.properties"
-          echo "" >> "$PROPS"
-          echo "org.gradle.jvmargs=-Xmx5120m -XX:MaxMetaspaceSize=512m -XX:+HeapDumpOnOutOfMemoryError" >> "$PROPS"
-          echo "org.gradle.parallel=false" >> "$PROPS"
-          echo "org.gradle.workers.max=2" >> "$PROPS"
-          echo "kotlin.daemon.jvmargs=-Xmx3000m" >> "$PROPS"
-          echo "org.gradle.configuration-cache=false" >> "$PROPS"
-          echo "Properties patched"
-          cat "$PROPS"
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -75,24 +33,16 @@ jobs:
         with:
           gradle-version: wrapper
 
-      - name: Make gradlew executable
-        run: chmod +x "$PROJECT_DIR/gradlew"
-
-      - name: Build Release APK
+      - name: Build APK
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
-          ./gradlew :app:assembleRelease \
-            --no-daemon \
-            --no-parallel \
-            --no-configuration-cache \
-            --stacktrace
-        env:
-          GRADLE_OPTS: "-Xmx2048m"
+          chmod +x ./gradlew
+          ./gradlew :app:assembleRelease --no-daemon --no-configuration-cache --no-parallel
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: WClient-Release-APK
+          name: WClient-APK
           path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 30
