@@ -1,9 +1,12 @@
-name: Build APK
+name: Build and Release APK
 
 on:
   push:
     branches: [ main, master ]
   workflow_dispatch:
+
+permissions:
+  contents: write   # GitHub Release banane ke liye zaroori hai
 
 jobs:
   build:
@@ -15,7 +18,7 @@ jobs:
 
       - name: Find and extract archive
         run: |
-          TARFILE=$(find . -not -path './.git/*' \( -name "*.tar.gz" -o -name "*.tar" \) | head -1)
+          TARFILE=$(find . -not -path "./.git/*" \( -name "*.tar.gz" -o -name "*.tar" \) | head -1)
           echo "Found: $TARFILE"
           mkdir -p extracted
           tar -xf "$TARFILE" -C extracted
@@ -33,16 +36,30 @@ jobs:
         with:
           gradle-version: wrapper
 
-      - name: Build APK
+      - name: Build signed APK
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
           chmod +x ./gradlew
           ./gradlew :app:assembleRelease --no-daemon --no-configuration-cache --no-parallel
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - name: Locate built APK
+        id: apk
+        run: |
+          APK_PATH=$(find "${{ env.PROJECT_DIR }}/app/build/outputs/apk/release" -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "APK nahi mila, build fail ho gaya hoga"
+            exit 1
+          fi
+          echo "path=$APK_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Create release tag
+        id: tag
+        run: echo "tag=v1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release with signed APK
+        uses: softprops/action-gh-release@v2
         with:
-          name: WClient-APK
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/release/*.apk
-          if-no-files-found: error
-          retention-days: 30
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: WClient ${{ steps.tag.outputs.tag }}
+          generate_release_notes: true
+          files: ${{ steps.apk.outputs.path }}
