@@ -22,10 +22,18 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Find project directory
+        id: projdir
+        run: |
+          DIR=$(find . -name "gradlew" | head -1 | xargs dirname)
+          echo "dir=$DIR" >> $GITHUB_OUTPUT
+          echo "Found project at: $DIR"
+
       - name: Make gradlew executable
-        run: chmod +x ./gradlew
+        run: chmod +x ${{ steps.projdir.outputs.dir }}/gradlew
 
       - name: Build Debug APK
+        working-directory: ${{ steps.projdir.outputs.dir }}
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Get APK path
