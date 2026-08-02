@@ -1,4 +1,4 @@
-name: Build and Release APK
+name: Build APK
 
 on:
   push:
@@ -6,24 +6,15 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # GitHub Release banane ke liye zaroori hai
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Find and extract archive
-        run: |
-          TARFILE=$(find . -not -path "./.git/*" \( -name "*.tar.gz" -o -name "*.tar" \) | head -1)
-          echo "Found: $TARFILE"
-          mkdir -p extracted
-          tar -xf "$TARFILE" -C extracted
-          PROJECT_DIR=$(find extracted -name "gradlew" -type f | head -1 | xargs dirname)
-          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -31,35 +22,31 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: wrapper
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
 
-      - name: Build signed APK
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: |
-          chmod +x ./gradlew
-          ./gradlew :app:assembleRelease --no-daemon --no-configuration-cache --no-parallel
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Locate built APK
+      - name: Get APK path
         id: apk
         run: |
-          APK_PATH=$(find "${{ env.PROJECT_DIR }}/app/build/outputs/apk/release" -name "*.apk" | head -n 1)
-          if [ -z "$APK_PATH" ]; then
-            echo "APK nahi mila, build fail ho gaya hoga"
-            exit 1
-          fi
-          echo "path=$APK_PATH" >> "$GITHUB_OUTPUT"
+          APK=$(find . -name "*.apk" -path "*/debug/*" | head -1)
+          echo "path=$APK" >> $GITHUB_OUTPUT
+          echo "APK found: $APK"
 
-      - name: Create release tag
-        id: tag
-        run: echo "tag=v1.0.${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BloodyShine-debug
+          path: ${{ steps.apk.outputs.path }}
+          retention-days: 30
 
-      - name: Create GitHub Release with signed APK
+      - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          name: WClient ${{ steps.tag.outputs.tag }}
-          generate_release_notes: true
+          tag_name: "v1.0.${{ github.run_number }}"
+          name: "BloodyShine v1.0.${{ github.run_number }}"
+          generate_release_notes: false
+          body: "Debug APK - Auto build #${{ github.run_number }}"
           files: ${{ steps.apk.outputs.path }}
