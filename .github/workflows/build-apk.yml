@@ -1,4 +1,4 @@
-name: Build APK from ZIP
+name: Build APK
 
 on:
   push:
@@ -10,41 +10,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
+    - name: Checkout code
       uses: actions/checkout@v4
-
-    - name: Find and Extract ZIP file
-      run: |
-        # Find ZIP file in repository
-        ZIP_FILE=$(find . -name "*.zip" -type f | head -1)
-        if [ -z "$ZIP_FILE" ]; then
-          echo "No ZIP file found!"
-          exit 1
-        fi
-        echo "Found ZIP: $ZIP_FILE"
-        
-        # Create extraction directory
-        mkdir -p extracted
-        
-        # Extract ZIP with proper permissions
-        unzip -q "$ZIP_FILE" -d extracted/
-        
-        # Find project folder
-        PROJECT_FOLDER=$(find extracted -maxdepth 1 -type d ! -name "extracted" | head -1)
-        echo "Project folder: $PROJECT_FOLDER"
-        
-        # Copy contents and preserve permissions
-        cp -r "$PROJECT_FOLDER"/* . || true
-        
-        # Fix permissions for gradlew
-        find . -name "gradlew" -type f -exec chmod +x {} \;
-        find . -name "gradle" -type f -exec chmod +x {} \;
-        
-        # List key files
-        echo "=== Checking key files ==="
-        ls -la gradlew 2>/dev/null || echo "gradlew not found"
-        ls -la settings.gradle.kts 2>/dev/null || echo "settings.gradle.kts not found"
-        ls -la app/build.gradle.kts 2>/dev/null || echo "app/build.gradle.kts not found"
 
     - name: Set up JDK 11
       uses: actions/setup-java@v4
@@ -52,12 +19,13 @@ jobs:
         java-version: '11'
         distribution: 'temurin'
 
-    - name: Build APK with Gradle
-      run: |
-        chmod +x ./gradlew
-        ./gradlew assembleDebug --stacktrace
+    - name: Make gradlew executable
+      run: chmod +x ./gradlew
 
-    - name: Upload APK artifact
+    - name: Build Release APK
+      run: ./gradlew assembleDebug
+
+    - name: Upload APK
       if: success()
       uses: actions/upload-artifact@v4
       with:
