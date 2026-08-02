@@ -1,0 +1,8 @@
+The gradle-wrapper.jar binary must be present for Gradle to function.
+To obtain it, run one of the following after extracting the project:
+  - Open the project in Android Studio (it will offer to install the Gradle wrapper automatically)
+  - Or run: gradle wrapper --gradle-version 8.4
+  - Or copy gradle-wrapper.jar from any existing Android project's gradle/wrapper/ directory
+
+The .jar is a binary file (~59KB) and cannot be distributed as plain text.
+Gradle version required: 8.4
