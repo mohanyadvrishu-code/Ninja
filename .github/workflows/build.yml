@@ -22,18 +22,23 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Install Gradle 8.4
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.4'
+      - name: Extract ZIP
+        run: |
+          ZIP=$(find . -name "*.zip" | head -1)
+          echo "ZIP: $ZIP"
+          unzip -o "$ZIP" -d extracted
 
       - name: Find project root
         id: projdir
         run: |
-          DIR=$(find . -name "settings.gradle.kts" -o -name "settings.gradle" | grep -v "/build/" | head -1 | xargs -I{} dirname {})
-          if [ -z "$DIR" ]; then DIR="."; fi
+          DIR=$(find extracted -name "settings.gradle.kts" -o -name "settings.gradle" | grep -v "/build/" | head -1 | xargs -I{} dirname {})
           echo "dir=$DIR" >> $GITHUB_OUTPUT
-          echo "Project dir: $DIR"
+          echo "Project: $DIR"
+
+      - name: Install Gradle 8.4
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.4'
 
       - name: Build Debug APK
         working-directory: ${{ steps.projdir.outputs.dir }}
@@ -44,7 +49,6 @@ jobs:
         run: |
           APK=$(find . -name "*.apk" -path "*/debug/*" | head -1)
           echo "path=$APK" >> $GITHUB_OUTPUT
-          echo "APK: $APK"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
