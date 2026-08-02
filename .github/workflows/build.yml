@@ -22,28 +22,37 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Find project directory
+      - name: Install Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.7'
+
+      - name: Find project root
         id: projdir
         run: |
-          DIR=$(find . -name "gradlew" | head -1 | xargs dirname)
+          DIR=$(find . -name "settings.gradle.kts" -o -name "settings.gradle" | grep -v "/build/" | head -1 | xargs -I{} dirname {})
+          if [ -z "$DIR" ]; then
+            DIR="."
+          fi
           echo "dir=$DIR" >> $GITHUB_OUTPUT
-          echo "Found project at: $DIR"
+          echo "Project dir: $DIR"
+          ls "$DIR"
 
-      - name: Make gradlew executable
-        run: chmod +x ${{ steps.projdir.outputs.dir }}/gradlew
+      - name: Fix gradlew if present
+        run: find . -name "gradlew" -exec chmod +x {} \; || true
 
       - name: Build Debug APK
         working-directory: ${{ steps.projdir.outputs.dir }}
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: gradle assembleDebug --no-daemon --stacktrace
 
-      - name: Get APK path
+      - name: Find APK
         id: apk
         run: |
           APK=$(find . -name "*.apk" -path "*/debug/*" | head -1)
           echo "path=$APK" >> $GITHUB_OUTPUT
-          echo "APK found: $APK"
+          echo "APK: $APK"
 
-      - name: Upload APK as artifact
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: BloodyShine-debug
@@ -56,5 +65,5 @@ jobs:
           tag_name: "v1.0.${{ github.run_number }}"
           name: "BloodyShine v1.0.${{ github.run_number }}"
           generate_release_notes: false
-          body: "Debug APK - Auto build #${{ github.run_number }}"
+          body: "Debug APK - Build #${{ github.run_number }}"
           files: ${{ steps.apk.outputs.path }}
