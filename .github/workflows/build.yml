@@ -22,24 +22,18 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Install Gradle
+      - name: Install Gradle 8.4
         uses: gradle/actions/setup-gradle@v3
         with:
-          gradle-version: '8.7'
+          gradle-version: '8.4'
 
       - name: Find project root
         id: projdir
         run: |
           DIR=$(find . -name "settings.gradle.kts" -o -name "settings.gradle" | grep -v "/build/" | head -1 | xargs -I{} dirname {})
-          if [ -z "$DIR" ]; then
-            DIR="."
-          fi
+          if [ -z "$DIR" ]; then DIR="."; fi
           echo "dir=$DIR" >> $GITHUB_OUTPUT
           echo "Project dir: $DIR"
-          ls "$DIR"
-
-      - name: Fix gradlew if present
-        run: find . -name "gradlew" -exec chmod +x {} \; || true
 
       - name: Build Debug APK
         working-directory: ${{ steps.projdir.outputs.dir }}
